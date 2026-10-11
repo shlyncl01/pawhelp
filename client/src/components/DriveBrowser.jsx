@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchEvents,
   fetchMyRegistrations,
@@ -9,6 +9,7 @@ import {
 import { CATEGORIES } from "../constants.js";
 import EventGrid from "./EventGrid.jsx";
 import Pagination from "./Pagination.jsx";
+import DriveModal from "./DriveModal.jsx";
 
 export default function DriveBrowser({ title, onChange }) {
   const [events, setEvents] = useState([]);
@@ -16,13 +17,16 @@ export default function DriveBrowser({ title, onChange }) {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [category, setCategory] = useState("All");
+  const [when, setWhen] = useState("upcoming");
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const requestId = useRef(0);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -32,39 +36,56 @@ export default function DriveBrowser({ title, onChange }) {
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      setError("");
+  const loadEvents = useCallback(
+    async (silent) => {
+      const current = ++requestId.current;
+      if (!silent) {
+        setLoading(true);
+        setError("");
+      }
       try {
         const res = await fetchEvents({
           search: debouncedSearch,
           category,
+          when,
           page,
           limit: 6,
         });
-        if (cancelled) return;
+        if (current !== requestId.current) return;
         setEvents(res.data.events);
         setPages(res.data.pages);
         setTotal(res.data.total);
       } catch (err) {
-        if (!cancelled) setError(errorMessage(err));
+        if (!silent && current === requestId.current) setError(errorMessage(err));
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!silent && current === requestId.current) setLoading(false);
       }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedSearch, category, page]);
+    },
+    [debouncedSearch, category, when, page]
+  );
 
-  useEffect(() => {
+  const loadJoined = useCallback(() => {
     fetchMyRegistrations()
       .then((res) => setJoinedIds(res.data.map((r) => r.event._id)))
-      .catch((err) => setError(errorMessage(err)));
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    loadEvents(false);
+  }, [loadEvents]);
+
+  useEffect(() => {
+    loadJoined();
+  }, [loadJoined]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.hidden) return;
+      loadEvents(true);
+      loadJoined();
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [loadEvents, loadJoined]);
 
   const replaceEvent = (updated) =>
     setEvents((list) => list.map((e) => (e._id === updated._id ? updated : e)));
@@ -81,6 +102,7 @@ export default function DriveBrowser({ title, onChange }) {
       if (onChange) onChange();
     } catch (err) {
       setError(errorMessage(err));
+      loadEvents(true);
     } finally {
       setBusyId(null);
     }
@@ -103,6 +125,9 @@ export default function DriveBrowser({ title, onChange }) {
     }
   };
 
+  const closeModal = useCallback(() => setSelectedId(null), []);
+  const selected = events.find((e) => e._id === selectedId);
+
   return (
     <section>
       <h2 className="section-title mb-3">
@@ -110,7 +135,7 @@ export default function DriveBrowser({ title, onChange }) {
       </h2>
 
       <div className="row g-3 mb-3">
-        <div className="col-12 col-md-8">
+        <div className="col-12 col-md-5">
           <input
             className="form-control"
             placeholder="Search drives by title..."
@@ -118,7 +143,7 @@ export default function DriveBrowser({ title, onChange }) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="col-12 col-md-4">
+        <div className="col-6 col-md-4">
           <select
             className="form-select"
             value={category}
@@ -131,6 +156,19 @@ export default function DriveBrowser({ title, onChange }) {
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
+          </select>
+        </div>
+        <div className="col-6 col-md-3">
+          <select
+            className="form-select"
+            value={when}
+            onChange={(e) => {
+              setWhen(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="upcoming">Upcoming drives</option>
+            <option value="past">Past drives</option>
           </select>
         </div>
       </div>
@@ -148,9 +186,21 @@ export default function DriveBrowser({ title, onChange }) {
             busyId={busyId}
             onJoin={handleJoin}
             onCancel={handleCancel}
+            onDetails={setSelectedId}
           />
           <Pagination page={page} pages={pages} onChange={setPage} />
         </>
+      )}
+
+      {selected && (
+        <DriveModal
+          event={selected}
+          joined={joinedIds.includes(selected._id)}
+          busy={busyId === selected._id}
+          onJoin={handleJoin}
+          onCancel={handleCancel}
+          onClose={closeModal}
+        />
       )}
     </section>
   );

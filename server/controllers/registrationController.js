@@ -1,18 +1,24 @@
 import Event from "../models/Event.js";
 import Registration from "../models/Registration.js";
+import { todayString } from "../utils/dates.js";
 
 export const registerForEvent = async (req, res) => {
   try {
     const event = await Event.findOneAndUpdate(
-      { _id: req.params.id, $expr: { $lt: ["$registered", "$capacity"] } },
+      {
+        _id: req.params.id,
+        date: { $gte: todayString() },
+        $expr: { $lt: ["$registered", "$capacity"] },
+      },
       { $inc: { registered: 1 } },
       { new: true },
     );
     if (!event) {
-      const exists = await Event.exists({ _id: req.params.id });
-      return exists
-        ? res.status(409).json({ message: "This drive is full" })
-        : res.status(404).json({ message: "Drive not found" });
+      const found = await Event.findById(req.params.id).select("date");
+      if (!found) return res.status(404).json({ message: "Drive not found" });
+      return found.date < todayString()
+        ? res.status(409).json({ message: "This drive has already ended" })
+        : res.status(409).json({ message: "This drive is full" });
     }
     try {
       await Registration.create({ event: event._id, user: req.user._id });

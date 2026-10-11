@@ -1,7 +1,14 @@
 import { FaDog } from "react-icons/fa";
 import EventCard from "./EventCard.jsx";
 
-export default function EventGrid({ events, joinedIds, busyId, onJoin, onCancel }) {
+export default function EventGrid({
+  events,
+  joinedIds,
+  busyId,
+  onJoin,
+  onCancel,
+  onDetails,
+}) {
   if (events.length === 0) {
     return (
       <div className="text-center meta py-5">
@@ -21,6 +28,7 @@ export default function EventGrid({ events, joinedIds, busyId, onJoin, onCancel 
             busy={busyId === event._id}
             onJoin={onJoin}
             onCancel={onCancel}
+            onDetails={onDetails}
           />
         </div>
       ))}

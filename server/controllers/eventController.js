@@ -1,5 +1,6 @@
 import Event from "../models/Event.js";
 import Registration from "../models/Registration.js";
+import { todayString } from "../utils/dates.js";
 
 const isOwner = (event, user) =>
   event.createdBy.toString() === user._id.toString() || user.role === "admin";
@@ -9,15 +10,20 @@ export const getEvents = async (req, res) => {
     const page = Math.max(parseInt(req.query.page) || 1, 1);
     const limit = Math.min(parseInt(req.query.limit) || 6, 24);
     const filter = {};
-    const { category } = req.query;
+    const { category, when } = req.query;
     if (category && category !== "All") filter.category = category;
     const search = (req.query.search || "")
       .replace(/[^a-zA-Z0-9 ]/g, "")
       .trim();
     if (search) filter.title = { $regex: search, $options: "i" };
+    const today = todayString();
+    if (when === "past") filter.date = { $lt: today };
+    else if (when !== "all") filter.date = { $gte: today };
+    const sort =
+      when === "past" ? { date: -1, time: -1 } : { date: 1, time: 1 };
     const total = await Event.countDocuments(filter);
     const events = await Event.find(filter)
-      .sort({ date: 1, time: 1 })
+      .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit);
     res.json({ events, page, pages: Math.ceil(total / limit) || 1, total });

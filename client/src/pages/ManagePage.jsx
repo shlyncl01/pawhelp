@@ -1,5 +1,11 @@
-import { useEffect, useState } from "react";
-import { FaMapMarkerAlt, FaRegCalendarAlt, FaRegEdit, FaRegTrashAlt } from "react-icons/fa";
+import { useCallback, useEffect, useState } from "react";
+import {
+  FaMapMarkerAlt,
+  FaRegCalendarAlt,
+  FaRegEdit,
+  FaRegTrashAlt,
+  FaUsers,
+} from "react-icons/fa";
 import {
   fetchMyEvents,
   createEvent,
@@ -8,30 +14,36 @@ import {
   errorMessage,
 } from "../api.js";
 import EventForm from "../components/EventForm.jsx";
+import DriveModal from "../components/DriveModal.jsx";
 
 export default function ManagePage() {
   const [events, setEvents] = useState([]);
   const [editing, setEditing] = useState(null);
+  const [viewing, setViewing] = useState(null);
   const [formKey, setFormKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async (silent) => {
     try {
       const res = await fetchMyEvents();
       setEvents(res.data);
     } catch (err) {
-      setError(errorMessage(err));
+      if (!silent) setError(errorMessage(err));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    load();
-  }, []);
+    load(false);
+    const timer = setInterval(() => {
+      if (!document.hidden) load(true);
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [load]);
 
   const resetForm = () => {
     setEditing(null);
@@ -51,7 +63,7 @@ export default function ManagePage() {
         setSuccess("Drive posted.");
       }
       resetForm();
-      await load();
+      await load(false);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -74,12 +86,16 @@ export default function ManagePage() {
     try {
       await deleteEvent(event._id);
       if (editing?._id === event._id) resetForm();
+      if (viewing?.id === event._id) setViewing(null);
       setSuccess("Drive deleted.");
-      await load();
+      await load(false);
     } catch (err) {
       setError(errorMessage(err));
     }
   };
+
+  const closeModal = useCallback(() => setViewing(null), []);
+  const viewingEvent = viewing && events.find((e) => e._id === viewing.id);
 
   return (
     <>
@@ -109,7 +125,11 @@ export default function ManagePage() {
               {events.map((e) => (
                 <div className="col-12 col-md-6" key={e._id}>
                   <div className="paw-card h-100 d-flex flex-column">
-                    <div className="cover-wrap">
+                    <div
+                      className="cover-wrap"
+                      style={{ cursor: "pointer" }}
+                      onClick={() => setViewing({ id: e._id, tab: "details" })}
+                    >
                       <img className="cover-img" src={e.image} alt={e.title} />
                       <span className="cat-pill">{e.category}</span>
                     </div>
@@ -126,7 +146,13 @@ export default function ManagePage() {
                       <p className="needed small">
                         {e.registered} of {e.capacity} volunteers signed up
                       </p>
-                      <div className="d-flex gap-2 mt-auto">
+                      <div className="d-flex gap-2 flex-wrap mt-auto">
+                        <button
+                          className="btn btn-outline-primary btn-sm flex-grow-1"
+                          onClick={() => setViewing({ id: e._id, tab: "volunteers" })}
+                        >
+                          <FaUsers className="me-1" /> Attendees
+                        </button>
                         <button className="btn btn-teal btn-sm flex-grow-1" onClick={() => handleEdit(e)}>
                           <FaRegEdit className="me-1" /> Edit
                         </button>
@@ -142,6 +168,19 @@ export default function ManagePage() {
           )}
         </div>
       </div>
+
+      {viewingEvent && (
+        <DriveModal
+          key={`${viewing.id}-${viewing.tab}`}
+          event={viewingEvent}
+          initialTab={viewing.tab}
+          joined={false}
+          busy={false}
+          onJoin={() => {}}
+          onCancel={() => {}}
+          onClose={closeModal}
+        />
+      )}
     </>
   );
 }

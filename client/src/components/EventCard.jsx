@@ -1,30 +1,30 @@
-import { FaMapMarkerAlt, FaMedal, FaShoppingBag } from "react-icons/fa";
+import { FaMapMarkerAlt, FaMedal, FaShoppingBag, FaInfoCircle } from "react-icons/fa";
+import { formatWhen, driveStatus } from "../utils.js";
 
-const formatWhen = (date, time) => {
-  const [y, m, d] = date.split("-").map(Number);
-  const [h, min] = time.split(":").map(Number);
-  const dt = new Date(y, m - 1, d, h, min);
-  const day = dt.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-  const hour = dt.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  return `${day} · ${hour}`;
-};
-
-export default function EventCard({ event, joined, busy, onJoin, onCancel }) {
+export default function EventCard({
+  event,
+  joined,
+  busy,
+  onJoin,
+  onCancel,
+  onDetails,
+}) {
   const needed = event.capacity - event.registered;
   const full = needed <= 0;
+  const status = driveStatus(event.date);
+  const ended = status === "ended";
 
   return (
-    <div className="paw-card h-100 d-flex flex-column">
-      <div className="cover-wrap">
+    <div className={`paw-card h-100 d-flex flex-column ${ended ? "ended" : ""}`}>
+      <div
+        className="cover-wrap"
+        style={{ cursor: "pointer" }}
+        onClick={() => onDetails(event._id)}
+      >
         <img className="cover-img" src={event.image} alt={event.title} />
         <span className="cat-pill">{event.category}</span>
+        {status === "today" && <span className="status-pill status-today">Today</span>}
+        {ended && <span className="status-pill status-ended">Ended</span>}
       </div>
 
       <div className="p-3 d-flex flex-column flex-grow-1">
@@ -45,36 +45,52 @@ export default function EventCard({ event, joined, busy, onJoin, onCancel }) {
             Bring: {event.whatToBring}
           </p>
         )}
-        {event.description && <p className="meta mt-2 mb-2">{event.description}</p>}
+        {event.description && (
+          <p className="meta mt-2 mb-2 clamp-3">{event.description}</p>
+        )}
 
         <div className="mt-auto pt-2">
-          <p className={`needed mb-2 ${full ? "full" : ""}`}>
-            {full
-              ? "Drive full"
-              : `${needed} of ${event.capacity} volunteers still needed`}
+          <p className={`needed mb-2 ${full || ended ? "full" : ""}`}>
+            {ended
+              ? "This drive has ended"
+              : full
+                ? "Drive full"
+                : `${needed} of ${event.capacity} volunteers still needed`}
           </p>
 
-          {joined ? (
+          <div className="d-flex gap-2">
             <button
-              className="btn btn-outline-primary w-100 py-2"
-              disabled={busy}
-              onClick={() => onCancel(event._id)}
+              className="btn btn-outline-secondary py-2"
+              onClick={() => onDetails(event._id)}
             >
-              {busy ? "Please wait..." : "Cancel my slot"}
+              <FaInfoCircle className="me-1" /> Details
             </button>
-          ) : full ? (
-            <button className="btn btn-full w-100 py-2" disabled>
-              Full
-            </button>
-          ) : (
-            <button
-              className="btn btn-primary w-100 py-2"
-              disabled={busy}
-              onClick={() => onJoin(event._id)}
-            >
-              {busy ? "Please wait..." : "Join this drive"}
-            </button>
-          )}
+            {ended ? (
+              <button className="btn btn-full flex-grow-1 py-2" disabled>
+                Ended
+              </button>
+            ) : joined ? (
+              <button
+                className="btn btn-outline-primary flex-grow-1 py-2"
+                disabled={busy}
+                onClick={() => onCancel(event._id)}
+              >
+                {busy ? "Please wait..." : "Cancel my slot"}
+              </button>
+            ) : full ? (
+              <button className="btn btn-full flex-grow-1 py-2" disabled>
+                Full
+              </button>
+            ) : (
+              <button
+                className="btn btn-primary flex-grow-1 py-2"
+                disabled={busy}
+                onClick={() => onJoin(event._id)}
+              >
+                {busy ? "Please wait..." : "Join this drive"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
