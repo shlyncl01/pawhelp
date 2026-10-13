@@ -44,6 +44,9 @@ export default function Navbar() {
                   <NavLink className="nav-link" to="/drives" onClick={close}>Drives</NavLink>
                 </li>
                 <li className="nav-item">
+                  <NavLink className="nav-link" to="/calendar" onClick={close}>Calendar</NavLink>
+                </li>
+                <li className="nav-item">
                   <NavLink className="nav-link" to="/my-drives" onClick={close}>My Drives</NavLink>
                 </li>
                 <li className="nav-item">

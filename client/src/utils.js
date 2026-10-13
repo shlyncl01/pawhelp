@@ -31,3 +31,37 @@ export const driveStatus = (date) => {
   if (date === today) return "today";
   return "upcoming";
 };
+export const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+export const monthKey = (year, monthIndex) =>
+  `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+
+export const formatTime = (time) => {
+  const [h, m] = time.split(":").map(Number);
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+export const formatDay = (date) => {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+};

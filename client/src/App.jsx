@@ -7,6 +7,7 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 import EventsPage from "./pages/EventsPage.jsx";
 import ManagePage from "./pages/ManagePage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
+import CalendarPage from "./pages/CalendarPage.jsx";
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/drives" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
           <Route path="/my-drives" element={<ProtectedRoute><ManagePage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

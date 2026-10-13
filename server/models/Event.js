@@ -1,5 +1,12 @@
 import mongoose from "mongoose";
 
+const announcementSchema = new mongoose.Schema(
+  {
+    message: { type: String, required: true, trim: true, maxlength: 500 },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } },
+);
+
 const eventSchema = new mongoose.Schema(
   {
     title: {
@@ -22,6 +29,11 @@ const eventSchema = new mongoose.Schema(
       type: String,
       required: [true, "Time is required"],
       match: [/^[0-9]{2}:[0-9]{2}$/, "Time must be HH:MM"],
+    },
+    endTime: {
+      type: String,
+      default: "",
+      match: [/^[0-9]{2}:[0-9]{2}$/, "End time must be HH:MM"],
     },
     location: {
       type: String,
@@ -53,6 +65,14 @@ const eventSchema = new mongoose.Schema(
       enum: ["None", "Beginner", "Experienced"],
       default: "None",
     },
+    status: {
+      type: String,
+      enum: ["active", "cancelled"],
+      default: "active",
+    },
+    cancelReason: { type: String, default: "", trim: true },
+    seriesId: { type: String, default: "" },
+    announcements: { type: [announcementSchema], default: [] },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -62,5 +82,7 @@ const eventSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+eventSchema.index({ date: 1, time: 1 });
 
 export default mongoose.model("Event", eventSchema);
