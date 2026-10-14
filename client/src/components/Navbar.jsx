@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { FaPaw } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext.jsx";
+import NotificationBell from "./NotificationBell.jsx";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -34,15 +35,17 @@ export default function Navbar() {
         </button>
 
         <div className={`collapse navbar-collapse ${open ? "show" : ""}`}>
-          {user ? (
-            <>
-              <ul className="navbar-nav me-auto ms-lg-3">
-                <li className="nav-item">
-                  <NavLink className="nav-link" to="/" end onClick={close}>Dashboard</NavLink>
-                </li>
-                <li className="nav-item">
-                  <NavLink className="nav-link" to="/drives" onClick={close}>Drives</NavLink>
-                </li>
+          <ul className="navbar-nav me-auto ms-lg-3">
+            {user && (
+              <li className="nav-item">
+                <NavLink className="nav-link" to="/" end onClick={close}>Dashboard</NavLink>
+              </li>
+            )}
+            <li className="nav-item">
+              <NavLink className="nav-link" to="/drives" onClick={close}>Drives</NavLink>
+            </li>
+            {user && (
+              <>
                 <li className="nav-item">
                   <NavLink className="nav-link" to="/calendar" onClick={close}>Calendar</NavLink>
                 </li>
@@ -52,16 +55,25 @@ export default function Navbar() {
                 <li className="nav-item">
                   <NavLink className="nav-link" to="/profile" onClick={close}>Profile</NavLink>
                 </li>
-              </ul>
-              <div className="d-flex align-items-center gap-3 mt-2 mt-lg-0">
-                <span className="nav-greeting">Hi, {user.name}</span>
-                <button className="btn btn-outline-primary" onClick={handleLogout}>
-                  Logout
-                </button>
-              </div>
-            </>
+              </>
+            )}
+            {user?.role === "admin" && (
+              <li className="nav-item">
+                <NavLink className="nav-link" to="/admin" onClick={close}>Admin</NavLink>
+              </li>
+            )}
+          </ul>
+
+          {user ? (
+            <div className="d-flex align-items-center gap-3 mt-2 mt-lg-0">
+              <NotificationBell />
+              <span className="nav-greeting">Hi, {user.name}</span>
+              <button className="btn btn-outline-primary" onClick={handleLogout}>
+                Logout
+              </button>
+            </div>
           ) : (
-            <div className="d-flex gap-2 ms-auto mt-2 mt-lg-0">
+            <div className="d-flex gap-2 mt-2 mt-lg-0">
               <Link className="btn btn-outline-primary" to="/login" onClick={close}>Login</Link>
               <Link className="btn btn-primary" to="/register" onClick={close}>Register</Link>
             </div>

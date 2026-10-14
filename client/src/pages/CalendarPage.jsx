@@ -10,6 +10,7 @@ import {
 } from "../api.js";
 import { CATEGORIES } from "../constants.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { confirmNoClash } from "../joinCheck.js";
 import { todayString, monthKey, MONTH_NAMES, formatDay } from "../utils.js";
 import Calendar, { CalendarList } from "../components/Calendar.jsx";
 import DriveModal from "../components/DriveModal.jsx";
@@ -19,7 +20,7 @@ export default function CalendarPage() {
   const [year, setYear] = useState(() => Number(todayString().slice(0, 4)));
   const [month, setMonth] = useState(() => Number(todayString().slice(5, 7)) - 1);
   const [events, setEvents] = useState([]);
-  const [joinedIds, setJoinedIds] = useState([]);
+  const [myStatus, setMyStatus] = useState({});
   const [category, setCategory] = useState("All");
   const [mineOnly, setMineOnly] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
@@ -52,9 +53,15 @@ export default function CalendarPage() {
     [key, category]
   );
 
-  const loadJoined = useCallback(() => {
+  const loadMine = useCallback(() => {
     fetchMyRegistrations()
-      .then((res) => setJoinedIds(res.data.map((r) => r.event._id)))
+      .then((res) => {
+        const map = {};
+        res.data.forEach((r) => {
+          map[r.event._id] = r.status === "waitlist" ? "waitlist" : "joined";
+        });
+        setMyStatus(map);
+      })
       .catch(() => {});
   }, []);
 
@@ -63,17 +70,17 @@ export default function CalendarPage() {
   }, [loadEvents]);
 
   useEffect(() => {
-    loadJoined();
-  }, [loadJoined]);
+    loadMine();
+  }, [loadMine]);
 
   useEffect(() => {
     const timer = setInterval(() => {
       if (document.hidden) return;
       loadEvents(true);
-      loadJoined();
+      loadMine();
     }, 15000);
     return () => clearInterval(timer);
-  }, [loadEvents, loadJoined]);
+  }, [loadEvents, loadMine]);
 
   const goTo = (y, m) => {
     let newYear = y;
@@ -111,21 +118,34 @@ export default function CalendarPage() {
     setEvents((list) =>
       list.map((e) =>
         e._id === updated._id
-          ? { ...e, registered: updated.registered, capacity: updated.capacity }
+          ? {
+              ...e,
+              registered: updated.registered,
+              capacity: updated.capacity,
+              status: updated.status,
+            }
           : e
       )
     );
   };
 
   const handleJoin = async (id) => {
+    const target = events.find((e) => e._id === id) || selected;
+    if (target && !(await confirmNoClash(target))) return;
     setError("");
     setSuccess("");
     setBusyId(id);
     try {
       const res = await joinEvent(id);
-      applyUpdate(res.data);
-      setJoinedIds((ids) => [...ids, id]);
-      setSuccess("You joined the drive. Thank you for helping!");
+      const { myStatus: result, ...updated } = res.data;
+      applyUpdate(updated);
+      const state = result === "waitlist" ? "waitlist" : "joined";
+      setMyStatus((m) => ({ ...m, [id]: state }));
+      setSuccess(
+        state === "waitlist"
+          ? "This drive is full, so you were added to the waitlist. We will notify you if a slot opens."
+          : "You joined the drive. Thank you for helping!"
+      );
     } catch (err) {
       setError(errorMessage(err));
       loadEvents(true);
@@ -138,11 +158,16 @@ export default function CalendarPage() {
     setError("");
     setSuccess("");
     setBusyId(id);
+    const wasWaiting = myStatus[id] === "waitlist";
     try {
       const res = await cancelEvent(id);
-      applyUpdate(res.data);
-      setJoinedIds((ids) => ids.filter((x) => x !== id));
-      setSuccess("Your spot was cancelled.");
+      if (res.data) applyUpdate(res.data);
+      setMyStatus((m) => {
+        const next = { ...m };
+        delete next[id];
+        return next;
+      });
+      setSuccess(wasWaiting ? "You left the waitlist." : "Your spot was cancelled.");
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -152,10 +177,13 @@ export default function CalendarPage() {
 
   const closeModal = useCallback(() => setSelected(null), []);
 
+  const idsWith = (kind) => Object.keys(myStatus).filter((id) => myStatus[id] === kind);
+  const joinedIds = idsWith("joined");
+  const waitlistIds = idsWith("waitlist");
+
   const visible = mineOnly
     ? events.filter(
-        (e) =>
-          String(e.createdBy) === String(user._id) || joinedIds.includes(e._id)
+        (e) => String(e.createdBy) === String(user._id) || myStatus[e._id]
       )
     : events;
 
@@ -255,8 +283,10 @@ export default function CalendarPage() {
         <div className="cal-legend mb-3">
           <span><i className="dot dot-upcoming" /> Upcoming</span>
           <span><i className="dot dot-joined" /> Joined</span>
+          <span><i className="dot dot-waitlist" /> Waitlisted</span>
           <span><i className="dot dot-mine" /> You organize</span>
           <span><i className="dot dot-ended" /> Ended</span>
+          <span><i className="dot dot-cancelled" /> Cancelled</span>
         </div>
 
         <div className={loading ? "cal-loading" : ""}>
@@ -266,6 +296,7 @@ export default function CalendarPage() {
               month={month}
               events={visible}
               joinedIds={joinedIds}
+              waitlistIds={waitlistIds}
               userId={user._id}
               selectedDay={selectedDay}
               onSelectEvent={openEvent}
@@ -277,6 +308,7 @@ export default function CalendarPage() {
             <CalendarList
               events={visible}
               joinedIds={joinedIds}
+              waitlistIds={waitlistIds}
               userId={user._id}
               onSelectEvent={openEvent}
               grouped
@@ -298,6 +330,7 @@ export default function CalendarPage() {
             <CalendarList
               events={dayEvents}
               joinedIds={joinedIds}
+              waitlistIds={waitlistIds}
               userId={user._id}
               onSelectEvent={openEvent}
             />
@@ -308,7 +341,8 @@ export default function CalendarPage() {
       {modalEvent && (
         <DriveModal
           event={modalEvent}
-          joined={joinedIds.includes(modalEvent._id)}
+          joined={myStatus[modalEvent._id] === "joined"}
+          waitlisted={myStatus[modalEvent._id] === "waitlist"}
           busy={busyId === modalEvent._id}
           onJoin={handleJoin}
           onCancel={handleCancel}

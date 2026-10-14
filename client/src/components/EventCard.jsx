@@ -1,21 +1,87 @@
 import { FaMapMarkerAlt, FaMedal, FaShoppingBag, FaInfoCircle } from "react-icons/fa";
 import { formatWhen, driveStatus } from "../utils.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 export default function EventCard({
   event,
   joined,
+  waitlisted = false,
   busy,
   onJoin,
   onCancel,
   onDetails,
 }) {
+  const { user } = useAuth();
   const needed = event.capacity - event.registered;
   const full = needed <= 0;
-  const status = driveStatus(event.date);
+  const status = driveStatus(event.date, event.status);
   const ended = status === "ended";
+  const cancelled = status === "cancelled";
+  const closed = ended || cancelled;
+
+  let message;
+  if (cancelled) message = "This drive was cancelled";
+  else if (ended) message = "This drive has ended";
+  else if (full) message = "Drive full · waitlist open";
+  else message = `${needed} of ${event.capacity} volunteers still needed`;
+
+  let action;
+  if (cancelled) {
+    action = (
+      <button className="btn btn-full flex-grow-1 py-2" disabled>
+        Cancelled
+      </button>
+    );
+  } else if (ended) {
+    action = (
+      <button className="btn btn-full flex-grow-1 py-2" disabled>
+        Ended
+      </button>
+    );
+  } else if (joined) {
+    action = (
+      <button
+        className="btn btn-outline-primary flex-grow-1 py-2"
+        disabled={busy}
+        onClick={() => onCancel(event._id)}
+      >
+        {busy ? "Please wait..." : "Cancel my slot"}
+      </button>
+    );
+  } else if (waitlisted) {
+    action = (
+      <button
+        className="btn btn-outline-primary flex-grow-1 py-2"
+        disabled={busy}
+        onClick={() => onCancel(event._id)}
+      >
+        {busy ? "Please wait..." : "Leave waitlist"}
+      </button>
+    );
+  } else if (full) {
+    action = (
+      <button
+        className="btn btn-teal flex-grow-1 py-2"
+        disabled={busy}
+        onClick={() => onJoin(event._id)}
+      >
+        {busy ? "Please wait..." : user ? "Join waitlist" : "Log in to join"}
+      </button>
+    );
+  } else {
+    action = (
+      <button
+        className="btn btn-primary flex-grow-1 py-2"
+        disabled={busy}
+        onClick={() => onJoin(event._id)}
+      >
+        {busy ? "Please wait..." : user ? "Join this drive" : "Log in to join"}
+      </button>
+    );
+  }
 
   return (
-    <div className={`paw-card h-100 d-flex flex-column ${ended ? "ended" : ""}`}>
+    <div className={`paw-card h-100 d-flex flex-column ${closed ? "ended" : ""}`}>
       <div
         className="cover-wrap"
         style={{ cursor: "pointer" }}
@@ -23,12 +89,13 @@ export default function EventCard({
       >
         <img className="cover-img" src={event.image} alt={event.title} />
         <span className="cat-pill">{event.category}</span>
+        {cancelled && <span className="status-pill status-cancelled">Cancelled</span>}
+        {!cancelled && ended && <span className="status-pill status-ended">Ended</span>}
         {status === "today" && <span className="status-pill status-today">Today</span>}
-        {ended && <span className="status-pill status-ended">Ended</span>}
       </div>
 
       <div className="p-3 d-flex flex-column flex-grow-1">
-        <div className="when mb-1">{formatWhen(event.date, event.time)}</div>
+        <div className="when mb-1">{formatWhen(event.date, event.time, event.endTime)}</div>
         <h5 className="fw-bold mb-1">{event.title}</h5>
         <p className="meta mb-1">{event.organization}</p>
         <p className="meta small mb-1">
@@ -50,13 +117,10 @@ export default function EventCard({
         )}
 
         <div className="mt-auto pt-2">
-          <p className={`needed mb-2 ${full || ended ? "full" : ""}`}>
-            {ended
-              ? "This drive has ended"
-              : full
-                ? "Drive full"
-                : `${needed} of ${event.capacity} volunteers still needed`}
-          </p>
+          <p className={`needed mb-2 ${full || closed ? "full" : ""}`}>{message}</p>
+          {waitlisted && !closed && (
+            <p className="waitlist-note small mb-2">You are on the waitlist</p>
+          )}
 
           <div className="d-flex gap-2">
             <button
@@ -65,31 +129,7 @@ export default function EventCard({
             >
               <FaInfoCircle className="me-1" /> Details
             </button>
-            {ended ? (
-              <button className="btn btn-full flex-grow-1 py-2" disabled>
-                Ended
-              </button>
-            ) : joined ? (
-              <button
-                className="btn btn-outline-primary flex-grow-1 py-2"
-                disabled={busy}
-                onClick={() => onCancel(event._id)}
-              >
-                {busy ? "Please wait..." : "Cancel my slot"}
-              </button>
-            ) : full ? (
-              <button className="btn btn-full flex-grow-1 py-2" disabled>
-                Full
-              </button>
-            ) : (
-              <button
-                className="btn btn-primary flex-grow-1 py-2"
-                disabled={busy}
-                onClick={() => onJoin(event._id)}
-              >
-                {busy ? "Please wait..." : "Join this drive"}
-              </button>
-            )}
+            {action}
           </div>
         </div>
       </div>

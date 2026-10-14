@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   fetchEvents,
   fetchMyRegistrations,
@@ -7,13 +8,20 @@ import {
   errorMessage,
 } from "../api.js";
 import { CATEGORIES } from "../constants.js";
+import { useAuth } from "../context/AuthContext.jsx";
 import EventGrid from "./EventGrid.jsx";
 import Pagination from "./Pagination.jsx";
 import DriveModal from "./DriveModal.jsx";
+import { confirmNoClash } from "../joinCheck.js";
 
 export default function DriveBrowser({ title, onChange }) {
+  const { user } = useAuth();
+  const userId = user?._id;
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [events, setEvents] = useState([]);
-  const [joinedIds, setJoinedIds] = useState([]);
+  const [myStatus, setMyStatus] = useState({});
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [category, setCategory] = useState("All");
@@ -64,41 +72,63 @@ export default function DriveBrowser({ title, onChange }) {
     [debouncedSearch, category, when, page]
   );
 
-  const loadJoined = useCallback(() => {
+  const loadMine = useCallback(() => {
+    if (!userId) {
+      setMyStatus({});
+      return;
+    }
     fetchMyRegistrations()
-      .then((res) => setJoinedIds(res.data.map((r) => r.event._id)))
-      .catch(() => {});
-  }, []);
+      .then((res) => {
+        const map = {};
+        res.data.forEach((r) => {
+          map[r.event._id] = r.status === "waitlist" ? "waitlist" : "joined";
+        });
+        setMyStatus(map);
+      })
+      .catch(() => { });
+  }, [userId]);
 
   useEffect(() => {
     loadEvents(false);
   }, [loadEvents]);
 
   useEffect(() => {
-    loadJoined();
-  }, [loadJoined]);
+    loadMine();
+  }, [loadMine]);
 
   useEffect(() => {
     const timer = setInterval(() => {
       if (document.hidden) return;
       loadEvents(true);
-      loadJoined();
+      loadMine();
     }, 15000);
     return () => clearInterval(timer);
-  }, [loadEvents, loadJoined]);
+  }, [loadEvents, loadMine]);
 
   const replaceEvent = (updated) =>
     setEvents((list) => list.map((e) => (e._id === updated._id ? updated : e)));
 
   const handleJoin = async (id) => {
+    if (!user) {
+      navigate("/login", { state: { from: location } });
+      return;
+    }
+    const target = events.find((e) => e._id === id);
+    if (target && !(await confirmNoClash(target))) return;
     setError("");
     setSuccess("");
     setBusyId(id);
     try {
       const res = await joinEvent(id);
-      replaceEvent(res.data);
-      setJoinedIds((ids) => [...ids, id]);
-      setSuccess("You joined the drive. Thank you for helping!");
+      const { myStatus: result, ...updated } = res.data;
+      replaceEvent(updated);
+      const state = result === "waitlist" ? "waitlist" : "joined";
+      setMyStatus((m) => ({ ...m, [id]: state }));
+      setSuccess(
+        state === "waitlist"
+          ? "This drive is full, so you were added to the waitlist. We will notify you if a slot opens."
+          : "You joined the drive. Thank you for helping!"
+      );
       if (onChange) onChange();
     } catch (err) {
       setError(errorMessage(err));
@@ -112,11 +142,16 @@ export default function DriveBrowser({ title, onChange }) {
     setError("");
     setSuccess("");
     setBusyId(id);
+    const wasWaiting = myStatus[id] === "waitlist";
     try {
       const res = await cancelEvent(id);
-      replaceEvent(res.data);
-      setJoinedIds((ids) => ids.filter((x) => x !== id));
-      setSuccess("Your spot was cancelled.");
+      if (res.data) replaceEvent(res.data);
+      setMyStatus((m) => {
+        const next = { ...m };
+        delete next[id];
+        return next;
+      });
+      setSuccess(wasWaiting ? "You left the waitlist." : "Your spot was cancelled.");
       if (onChange) onChange();
     } catch (err) {
       setError(errorMessage(err));
@@ -127,6 +162,10 @@ export default function DriveBrowser({ title, onChange }) {
 
   const closeModal = useCallback(() => setSelectedId(null), []);
   const selected = events.find((e) => e._id === selectedId);
+
+  const idsWith = (kind) => Object.keys(myStatus).filter((id) => myStatus[id] === kind);
+  const joinedIds = idsWith("joined");
+  const waitlistIds = idsWith("waitlist");
 
   return (
     <section>
@@ -183,6 +222,7 @@ export default function DriveBrowser({ title, onChange }) {
           <EventGrid
             events={events}
             joinedIds={joinedIds}
+            waitlistIds={waitlistIds}
             busyId={busyId}
             onJoin={handleJoin}
             onCancel={handleCancel}
@@ -196,6 +236,7 @@ export default function DriveBrowser({ title, onChange }) {
         <DriveModal
           event={selected}
           joined={joinedIds.includes(selected._id)}
+          waitlisted={waitlistIds.includes(selected._id)}
           busy={busyId === selected._id}
           onJoin={handleJoin}
           onCancel={handleCancel}

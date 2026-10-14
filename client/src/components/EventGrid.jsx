@@ -4,6 +4,7 @@ import EventCard from "./EventCard.jsx";
 export default function EventGrid({
   events,
   joinedIds,
+  waitlistIds = [],
   busyId,
   onJoin,
   onCancel,
@@ -25,6 +26,7 @@ export default function EventGrid({
           <EventCard
             event={event}
             joined={joinedIds.includes(event._id)}
+            waitlisted={waitlistIds.includes(event._id)}
             busy={busyId === event._id}
             onJoin={onJoin}
             onCancel={onCancel}

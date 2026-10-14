@@ -4,10 +4,13 @@ import { driveStatus, todayString, formatTime, monthKey } from "../utils.js";
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const MAX_CHIPS = 2;
 
-const statusOf = (event, joinedIds, userId) => {
-  if (driveStatus(event.date) === "ended") return "ended";
+const statusOf = (event, joinedIds, waitlistIds, userId) => {
+  const s = driveStatus(event.date, event.status);
+  if (s === "cancelled") return "cancelled";
+  if (s === "ended") return "ended";
   if (String(event.createdBy) === String(userId)) return "mine";
   if (joinedIds.includes(event._id)) return "joined";
+  if (waitlistIds.includes(event._id)) return "waitlist";
   return "upcoming";
 };
 
@@ -16,6 +19,7 @@ export default function Calendar({
   month,
   events,
   joinedIds,
+  waitlistIds = [],
   userId,
   selectedDay,
   onSelectEvent,
@@ -66,7 +70,7 @@ export default function Calendar({
                 <button
                   key={e._id}
                   type="button"
-                  className={`cal-chip chip-${statusOf(e, joinedIds, userId)}`}
+                  className={`cal-chip chip-${statusOf(e, joinedIds, waitlistIds, userId)}`}
                   title={`${formatTime(e.time)} ${e.title}`}
                   onClick={(ev) => {
                     ev.stopPropagation();
@@ -85,7 +89,23 @@ export default function Calendar({
   );
 }
 
-export function CalendarList({ events, joinedIds, userId, onSelectEvent, grouped }) {
+const formatDayLabel = (date) => {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+};
+
+export function CalendarList({
+  events,
+  joinedIds,
+  waitlistIds = [],
+  userId,
+  onSelectEvent,
+  grouped,
+}) {
   if (events.length === 0) {
     return <p className="meta mb-0">No drives to show.</p>;
   }
@@ -96,11 +116,13 @@ export function CalendarList({ events, joinedIds, userId, onSelectEvent, grouped
   });
 
   const tagText = (e, status) => {
+    if (status === "cancelled") return "Cancelled";
     if (status === "ended") return "Ended";
     if (status === "mine") return "You organize";
     if (status === "joined") return "Joined";
+    if (status === "waitlist") return "Waitlisted";
     const left = e.capacity - e.registered;
-    return left <= 0 ? "Full" : `${left} slots left`;
+    return left <= 0 ? "Full · waitlist" : `${left} slots left`;
   };
 
   return (
@@ -111,7 +133,7 @@ export function CalendarList({ events, joinedIds, userId, onSelectEvent, grouped
           <div key={date} className="mb-3">
             {grouped && <div className="detail-label mb-2">{formatDayLabel(date)}</div>}
             {groups[date].map((e) => {
-              const status = statusOf(e, joinedIds, userId);
+              const status = statusOf(e, joinedIds, waitlistIds, userId);
               return (
                 <button
                   key={e._id}
@@ -136,12 +158,3 @@ export function CalendarList({ events, joinedIds, userId, onSelectEvent, grouped
     </div>
   );
 }
-
-const formatDayLabel = (date) => {
-  const [y, m, d] = date.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-};

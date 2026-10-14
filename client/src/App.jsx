@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "./components/Navbar.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import { useAuth } from "./context/AuthContext.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import RegisterPage from "./pages/RegisterPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
@@ -10,6 +11,8 @@ import ProfilePage from "./pages/ProfilePage.jsx";
 import CalendarPage from "./pages/CalendarPage.jsx";
 
 export default function App() {
+  const { user } = useAuth();
+
   return (
     <>
       <Navbar />
@@ -17,8 +20,11 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-          <Route path="/drives" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
+          <Route
+            path="/"
+            element={user ? <DashboardPage /> : <Navigate to="/drives" replace />}
+          />
+          <Route path="/drives" element={<EventsPage />} />
           <Route path="/my-drives" element={<ProtectedRoute><ManagePage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />

@@ -212,7 +212,7 @@ export const cancelEvent = async (req, res) => {
       return res.status(400).json({ message: "This drive is already cancelled" });
     }
 
-    const reason = (req.body.reason || "").trim().slice(0, 300);
+    const reason = (req.body?.reason || "").trim().slice(0, 300);
     event.status = "cancelled";
     event.cancelReason = reason;
     await event.save();
