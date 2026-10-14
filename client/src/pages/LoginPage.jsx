@@ -9,8 +9,12 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || "/";
+  const registered = location.state?.registered;
 
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({
+    email: location.state?.email || "",
+    password: "",
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -45,6 +49,11 @@ export default function LoginPage() {
           <h3 className="fw-bold text-center mb-1">Welcome back</h3>
           <p className="text-center meta">Every paw needs a helping hand.</p>
 
+          {registered && !error && (
+            <div className="alert alert-success">
+              Account created! Please log in to continue.
+            </div>
+          )}
           {error && <div className="alert alert-danger">{error}</div>}
 
           <form onSubmit={handleSubmit} noValidate>

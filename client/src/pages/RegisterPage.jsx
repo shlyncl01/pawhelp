@@ -2,10 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaPaw } from "react-icons/fa";
 import { registerUser, errorMessage } from "../api.js";
-import { useAuth } from "../context/AuthContext.jsx";
 
 export default function RegisterPage() {
-  const { login } = useAuth();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -30,13 +28,16 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const res = await registerUser({
+      await registerUser({
         name: form.name,
         email: form.email,
         password: form.password,
       });
-      login(res.data.token, res.data.user);
-      navigate("/", { replace: true });
+      // Do not log the user in here; send them to the login page instead
+      navigate("/login", {
+        replace: true,
+        state: { registered: true, email: form.email },
+      });
     } catch (err) {
       setError(errorMessage(err));
     } finally {

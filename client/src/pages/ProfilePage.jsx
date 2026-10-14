@@ -21,10 +21,11 @@ export default function ProfilePage() {
     if (password && password.length < 6)
       return setError("Password must be at least 6 characters");
     if (password !== confirm) return setError("Passwords do not match");
+    if (name.trim() === user.name && !password) return setError("No changes to save");
 
     setLoading(true);
     try {
-      const data = { name };
+      const data = { name: name.trim() };
       if (password) data.password = password;
       const res = await updateProfile(data);
       updateUser(res.data.user);
@@ -47,7 +48,7 @@ export default function ProfilePage() {
           {error && <div className="alert alert-danger">{error}</div>}
           {success && <div className="alert alert-success">{success}</div>}
 
-          <form onSubmit={handleSubmit} noValidate>
+          <form onSubmit={handleSubmit} noValidate autoComplete="off">
             <div className="mb-3">
               <label className="form-label fw-bold">Email</label>
               <input className="form-control" value={user.email} disabled />
@@ -58,15 +59,32 @@ export default function ProfilePage() {
             </div>
             <div className="mb-3">
               <label className="form-label fw-bold">Name</label>
-              <input className="form-control" value={name} onChange={(e) => setName(e.target.value)} />
+              <input
+                className="form-control"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+              />
             </div>
             <div className="mb-3">
               <label className="form-label fw-bold">New password (leave blank to keep)</label>
-              <input type="password" className="form-control" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <input
+                type="password"
+                className="form-control"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+              />
             </div>
             <div className="mb-3">
               <label className="form-label fw-bold">Confirm new password</label>
-              <input type="password" className="form-control" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+              <input
+                type="password"
+                className="form-control"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                autoComplete="new-password"
+              />
             </div>
             <button className="btn btn-primary w-100 py-2" disabled={loading}>
               {loading ? "Saving..." : "Save changes"}
